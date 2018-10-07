@@ -8,6 +8,12 @@ from PProbe_util import Util
 from PProbe_filter import Filters
 ppsel = Selectors(None)
 
+def get_script_directory():
+    path = os.path.realpath(sys.argv[0])
+    if os.path.isdir(path):
+        return path
+    else:
+        return os.path.dirname(path)
 
 class DataIO:
      def __init__(self,phenix_python=True):
@@ -38,10 +44,10 @@ class DataIO:
 
           self.common_elem = ['BA','BR','HG','I','CO','CD','NI','CU','FE','K','MN','NA','CA','CL','MG','ZN']
 
-          self.common_oth = ['DTT', 'MAL', 'EOH', 'SUC', 'SCN', 'P6G', 'GSH', 'CO3', 'CIT', 'BOG', 'NO3', 'IMD', 'BME', 'ACY', 
-                             'PGE', 'PG4', 'TRS', 'MPD', 'DMS', 'PEG', 'ACT', 'EDO', 'GOL', 'CL',  'BR',  'AZI', 'GNP', 'BGC', 
-                             'BEN', 'H4B', 'SF4', 'GLC', 'RET', '1PE', 'ACP', 'CAC', 'FLC', 'EPE', 'AKG', 'LDA', 'SAM', 'POP', 
-                             'F3S', 'NAI', 'MLI', 'NDG', 'THP', 'HED', 'NH4', 'TLA', 'FES', 'HEC', 'MRD', 'UNL', 'IPA', 'PLP', 
+          self.common_oth = ['DTT', 'MAL', 'EOH', 'SUC', 'SCN', 'P6G', 'GSH', 'CO3', 'CIT', 'BOG', 'NO3', 'IMD', 'BME', 'ACY',
+                             'PGE', 'PG4', 'TRS', 'MPD', 'DMS', 'PEG', 'ACT', 'EDO', 'GOL', 'CL',  'BR',  'AZI', 'GNP', 'BGC',
+                             'BEN', 'H4B', 'SF4', 'GLC', 'RET', '1PE', 'ACP', 'CAC', 'FLC', 'EPE', 'AKG', 'LDA', 'SAM', 'POP',
+                             'F3S', 'NAI', 'MLI', 'NDG', 'THP', 'HED', 'NH4', 'TLA', 'FES', 'HEC', 'MRD', 'UNL', 'IPA', 'PLP',
                              'MES', 'NCO', 'PLM', 'MAN']
 
           self.common_met = ['MG','CA','ZN','MN','NI','CD','CO','FE']
@@ -103,7 +109,7 @@ class DataIO:
                  "mf":"mf",
                  "mflag":"mflag",
                  "model":"model",
-                 "label":"lab",                
+                 "label":"lab",
                  "omit":"omit",
                  "orires":"ori",
                  "rc":"rc",
@@ -148,7 +154,7 @@ class DataIO:
 
      def initialize_master(self,num_peaks):
           """
-          Define the master numpy array that holds all peak information for numerical analysis 
+          Define the master numpy array that holds all peak information for numerical analysis
           including features, calculated values, contact lists, etc.
           FIELD       Data Type     Description
           unal        i8         info    -- unal for each input peak, completely unique 64bit int
@@ -210,7 +216,7 @@ class DataIO:
           cc          i1         info -- contact class (quality of fit to contact calc values)
           mf          i4         info -- peak cluster class (multiple peaks for one solvent molecule, etc.)
           rc          i1         info -- results class (S/W assignment and how many stats below cutoffs)
-          status      i4         info -- status int 
+          status      i4         info -- status int
           tflag       i4         info -- temporary flag
           scr1        f4         scr  -- column for storing/pasing intermediate results
           scr2        f4         scr  -- column for storing/pasing intermediate results
@@ -231,12 +237,12 @@ class DataIO:
           master_data=np.zeros(num_peaks,dtype=self.master_dtype)
           return master_data
 
-     
+
 
      def read_master_dict(self,input_dfile=None):
 #          try:
           if input_dfile is None:
-               dfile = open("pprobe_master.dict",'r')
+               dfile = open(os.path.join(get_script_directory(),"pprobe_master.dict"),'r')
                dstring = dfile.read().strip()
                self.master_dict = ast.literal_eval(dstring)
                dfile.close()
@@ -249,7 +255,7 @@ class DataIO:
           return self.master_dict
 
      def write_master_dict(self,master_dict,output_dfile=None):
-          
+
           if output_dfile is not None:
                outfile = output_dfile
           else:

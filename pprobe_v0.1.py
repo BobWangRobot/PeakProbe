@@ -16,7 +16,7 @@ from mmtbx import map_tools
 from mmtbx import find_peaks
 from cctbx import maptbx
 from cctbx.array_family import flex
-import iotbx.pdb 
+import iotbx.pdb
 from libtbx import easy_pickle
 from cStringIO import StringIO
 
@@ -27,6 +27,7 @@ from libtbx.utils import multi_out
 
 from PProbe_tasks import PProbeTasks
 from PProbe_tasks import PhenixTasks
+import PProbe_dataio
 from PProbe_dataio import DataIO
 from PProbe_output import Output
 
@@ -105,7 +106,7 @@ input {
     score_res = None
       .type = float
       .short_caption = input resolution for peak scoring
-    map_omit_mode = *omitsw omitsol valsol asis 
+    map_omit_mode = *omitsw omitsol valsol asis
       .type = choice
       .short_caption = atom omits during map generation
       .help = Options for atom omits during map generation or allowing mapin
@@ -120,9 +121,9 @@ input {
      .short_caption = Write peaks to PDB file if not input
     write_strip = False
      .type = bool
-     .short_caption = Write stripped PDB 
+     .short_caption = Write stripped PDB
   }
-}    
+}
 maps{
   include scope mmtbx.maps.map_and_map_coeff_params_str
   map_coefficients {
@@ -137,7 +138,7 @@ maps{
     format = mtz
     mtz_label_amplitudes = FOFCWT
     mtz_label_phases = PHFOFCWT
-    fill_missing_f_obs = False 
+    fill_missing_f_obs = False
   }
   scattering_table = wk1995  it1992  *n_gaussian  neutron electron
     .type = choice
@@ -156,7 +157,7 @@ peak_search{
 }
 output {
   directory = None
-    .type = path  
+    .type = path
   output_file_name_prefix = None
     .type = str
     .short_caption = Output prefix
@@ -191,7 +192,7 @@ pprobe{
       .short_caption = string for pdb/map writing (cev feature)
     ressig = None
       .type = float
-      .short_caption = user input restraint for realspace 
+      .short_caption = user input restraint for realspace
       .help = dev option -- not well tested
     write_maps = False
       .type = bool
@@ -204,7 +205,7 @@ pprobe{
   }
 }
 gui
-  .help = "GUI-specific parameter required for output directory" 
+  .help = "GUI-specific parameter required for output directory"
   {
   output_dir = None
     .type = path
@@ -213,7 +214,7 @@ gui
 
 """
 
-#adjust cautiously, much of the functionality of pprobe relies on 
+#adjust cautiously, much of the functionality of pprobe relies on
 #having a range of peaks, even with short contacts
 
 peak_search_param_str="""\
@@ -247,7 +248,7 @@ def run_pprobe(all_params, log = sys.stdout):
   ppout = Output()
   ppio = DataIO()
   outstem = all_params.output.output_file_name_prefix
-  
+
   omit_mode = all_params.input.parameters.map_omit_mode
   pptask = PhenixTasks(phenix_params=all_params.output.output_file_name_prefix+"_pprobe.param")
 
@@ -330,7 +331,8 @@ def process_inputs(args, log = sys.stdout):
 
   #check for master param dictionary
   if params.input.model_param.model_dict_file is None:
-    params.input.model_param.model_dict_file = "pprobe_master.dict"
+    params.input.model_param.model_dict_file = os.path.join(PProbe_dataio.get_script_directory(),
+                                                            "pprobe_master.dict")
   if not os.path.isfile(params.input.model_param.model_dict_file):
     print >> log,"WARNING -- param file not found!"
     print >> log,"--> trying pprobe_master.dict . . . "
@@ -384,7 +386,7 @@ def process_inputs(args, log = sys.stdout):
     new_params.show()
 
 
-    #DATA PROCESSING  
+    #DATA PROCESSING
     #setup model pdb (required and should be known)
     crystal_symmetry = check_symmetry(inputs,params,log)
     model_pdb_input = iotbx.pdb.input(file_name = params.input.pdb.model_pdb)
@@ -418,7 +420,7 @@ def process_inputs(args, log = sys.stdout):
       f_obs,r_free_flags = setup_reflection_data(inputs,params,crystal_symmetry,reflection_files,log)
       #maps object is list of miller arrays
       maps = create_pprobe_maps(f_obs,r_free_flags,params,strip_xrs,strip_hier,log)
-      map_fname =params.output.output_file_name_prefix+"_pprobe_maps.mtz" 
+      map_fname =params.output.output_file_name_prefix+"_pprobe_maps.mtz"
       print >> log, "Writing PProbe maps to MTZ file: ",map_fname
       maps.write_mtz_file(map_fname)
       params.input.input_map.map_coeff_file = params.output.output_file_name_prefix+"_pprobe_maps.mtz"
@@ -446,12 +448,12 @@ def process_inputs(args, log = sys.stdout):
         pdb_str = peaks_pdb_str(peaks_result)
         peak_pdb = iotbx.pdb.input(source_info=None, lines=flex.split_lines(pdb_str))
         peak_hier = peak_pdb.construct_hierarchy()
-        peak_filename =params.output.output_file_name_prefix+"_pprobe_peaks.pdb" 
+        peak_filename =params.output.output_file_name_prefix+"_pprobe_peaks.pdb"
         print >> log,"Writing Peaks to %s:" % peak_filename
         peak_hier.write_pdb_file(file_name = peak_filename,crystal_symmetry=crystal_symmetry,append_end=True,anisou=False)
         params.input.pdb.peaks_pdb = peak_filename
       else:
-        peak_filename =params.output.output_file_name_prefix+"_pprobe_peaks.pdb" 
+        peak_filename =params.output.output_file_name_prefix+"_pprobe_peaks.pdb"
         peak_xrs,peak_hier = create_sol_pdb(model_hier,model_xrs,params.input.parameters.map_omit_mode,log)
         print >> log,"Writing Peaks to %s:" % peak_filename
         peak_hier.write_pdb_file(file_name = peak_filename,crystal_symmetry=crystal_symmetry,append_end=True,anisou=False)
@@ -460,7 +462,7 @@ def process_inputs(args, log = sys.stdout):
     #Wrap up, display file names and info for manual input
     #save parameters for next stage
     new_phil = working_phil.format(python_object = params)
-    phil_fname = params.output.output_file_name_prefix+"_pprobe.param" 
+    phil_fname = params.output.output_file_name_prefix+"_pprobe.param"
     f = open(phil_fname, "w")
     f.write(new_phil.as_str())
     f.close()
@@ -484,7 +486,7 @@ def process_inputs(args, log = sys.stdout):
       raise Sorry("\n\tPKL input requested but no file available\n"+\
                   "\t\t\t cannot find %s" % pkl_file)
     new_phil = working_phil.format(python_object = params)
-    phil_fname = params.output.output_file_name_prefix+"_pprobe.param" 
+    phil_fname = params.output.output_file_name_prefix+"_pprobe.param"
     f = open(phil_fname, "w")
     f.write(new_phil.as_str())
     f.close()
@@ -493,7 +495,7 @@ def process_inputs(args, log = sys.stdout):
     print >> log, "Runtime Parameters:"
     new_params.show()
     return params
-      
+
 def find_map_peaks(params,strip_xrs,log):
   #Adapted from mmtbx fine_peaks.py and
   #phenix find_peaks_holes.py, simplified to just give
@@ -517,7 +519,7 @@ def find_map_peaks(params,strip_xrs,log):
   peaks = peaks_result.peaks()#returns heights,coords(frac)
   unit_cell = strip_xrs.unit_cell()#need cell for cartesian
   peaks.sites = unit_cell.orthogonalize(peaks.sites)
-  
+
   return peaks
 
 
@@ -548,10 +550,10 @@ def peaks_pdb_str(peaks):
 
 def format_atom(serial,name,alt,resname,chain,resid,ins,x,y,z,occ,temp,element,charge):
   #canonical PDB formatting
-  pdb_fmt_str ="{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}\n" 
-  return pdb_fmt_str.format("ATOM",serial,name,alt,resname,chain,resid,ins,x,y,z,occ,temp,element,charge)  
+  pdb_fmt_str ="{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}\n"
+  return pdb_fmt_str.format("ATOM",serial,name,alt,resname,chain,resid,ins,x,y,z,occ,temp,element,charge)
 
-  
+
 def check_symmetry(inputs,params,log):
   #check for usable and consistent symmetry
   #somehow, this happens beforehand sometimes?
@@ -559,14 +561,14 @@ def check_symmetry(inputs,params,log):
   print >> log, "_"*79
   print >> log,"Checking Crystal Symmetry:"
   crystal_symmetry = None
-  crystal_symmetry = inputs.crystal_symmetry 
+  crystal_symmetry = inputs.crystal_symmetry
   if (crystal_symmetry is None):
     crystal_symmetries = []
     for f in [str(params.input.pdb.model_pdb), str(params.input.reflection_data.reflection_file_name)]:
       cs = crystal_symmetry_from_any.extract_from(f)
-      if(cs is not None): 
+      if(cs is not None):
         crystal_symmetries.append(cs)
-    if(len(crystal_symmetries) == 1): 
+    if(len(crystal_symmetries) == 1):
       crystal_symmetry = crystal_symmetries[0]
     elif(len(crystal_symmetries) == 0):
       raise Sorry("No crystal symmetry found.")
@@ -640,13 +642,13 @@ def split_mac_sol(pdb_hier,pdb_xrs,omit_mode,log):
   if(omit_mode is not 'asis'):
     watnames = ['HOH',]      #other water names, TIP etc?
     so4names = ['SO4','PO4']
-    othnames = ['DTT', 'MAL', 'EOH', 'SUC', 'SCN', 'P6G', 'GSH', 'CO3', 'CIT', 'BOG', 'NO3', 'IMD', 'BME', 'ACY', 
-                'PGE', 'PG4', 'TRS', 'MPD', 'DMS', 'PEG', 'ACT', 'EDO', 'GOL', 'CL', ' BR', 'AZI', 'GNP', 'BGC', 
-                'BEN', 'H4B', 'SF4', 'GLC', 'RET', '1PE', 'ACP', 'CAC', 'FLC', 'EPE', 'AKG', 'LDA', 'SAM', 'POP', 
-                'F3S', 'NAI', 'MLI', 'NDG', 'THP', 'HED', 'NH4', 'TLA', 'FES', 'HEC', 'MRD', 'UNL', 'IPA', 'PLP', 
+    othnames = ['DTT', 'MAL', 'EOH', 'SUC', 'SCN', 'P6G', 'GSH', 'CO3', 'CIT', 'BOG', 'NO3', 'IMD', 'BME', 'ACY',
+                'PGE', 'PG4', 'TRS', 'MPD', 'DMS', 'PEG', 'ACT', 'EDO', 'GOL', 'CL', ' BR', 'AZI', 'GNP', 'BGC',
+                'BEN', 'H4B', 'SF4', 'GLC', 'RET', '1PE', 'ACP', 'CAC', 'FLC', 'EPE', 'AKG', 'LDA', 'SAM', 'POP',
+                'F3S', 'NAI', 'MLI', 'NDG', 'THP', 'HED', 'NH4', 'TLA', 'FES', 'HEC', 'MRD', 'UNL', 'IPA', 'PLP',
                 'MES', 'NCO', 'PLM', 'MAN']
     elenames = ['BR','I','CO','CD','NI','CU','FE','MN','CA','CL','MG','ZN']
-    if omit_mode == 'omitsw':      
+    if omit_mode == 'omitsw':
       to_omit = watnames + so4names
       print >> log, "  Omitting SO4/PO4 and HOH from model"
     if omit_mode == 'omitsol' or omit_mode == 'valsol':
@@ -722,33 +724,33 @@ def null_sanity(peak_unal_db,all_params):
     model_pdb = all_params.input.pdb.model_pdb[0]
     cs = crystal_symmetry_from_any.extract_from(model_pdb)
 
-    null_peak = {'edc': 0, 'sol_contacts': [], '2fofc_sig_out': 0.0, 'wat_2fofc_ref_oricoords': (), 'pick_name': '', 
-                 'c1': 0.0, 'clust_score': 0, 'so4_cc_2fofc_inv_out': 0.0, 'ambig': 0, 'charge': 0.0, 'bin': 0, 
-                 'wat_cc_2fofc_in': 0.0, 'llgS': 0.0, 'fofc_sig_in': 0.0, '2fofc_sig_in': 0.0, 'llgW': 0.0, 'scr3': 0.0, 
-                 'modexp_clust': [], 'tflag': 0, 'orires': '', 'so4_cc_fofc_inv_in': 0.0, 'resid': '0', 'resat': 'NUL_P0_O', 
-                 'coord': (999.99, 999.99, 999.99), 'dmove': 0.0, 'unrg': 6626794411521655213, 'wat_cc_fofc_in': 0.0, 'ptype': '', 
-                 'cont_db': {}, 'batch': 0, 'wat_cc_fofc_inv': 0.0, 'mod_for': [], 'pdb_code': '', 'clash': False, 
-                 'so4_fofc_stdev_cc60': 0.0, 'contacts': [], 'so4_2fofc_stdev_cc60': 0.0, 'wat_cc_2fofc_out': 0.0, 'label': 0, 
-                 'strip_contacts': [], 'score': 0.0, 'clust_rank': 0, 'rc': 0, 'so4_fofc_coord_out': (), 'prob': 0.0, 'wat_fofc_coord_out': (), 
-                 'db_id': 'null_P_00000', 'ori_chain': 'P', 'so4_cc_2fofc_out': 0.0, 'wm': 0, 'wl': 0, 'solc': 0.0, 'so4_cc_fofc_out': 0.0, 
-                 'wt': 0, 'master_dict': {}, 'ol': 0, 'so4_cc_fofc_in': 0.0, 'oh': 0, 'clust_mem': [], 'so4_cc_2fofc_in': 0.0, 'omit': 0, 
-                 'pick': 0, 'cscore': 0.0, 'so4_cc_fofc_inv_rev': 0.0, 'peak_contacts': [], 'cc': 0, 'mm_contacts': [], 
-                 'unat': -6006398286768061262, 'clust_cent': 0.0, 'cllgW': 0.0, 'cllgS': 0.0, 'unal': -8861610501908601326, 
-                 'ori_resid': '0', 'mod_cont': [], 'om': 0, 'anc_for': [], 
-                 'so4_2fofc_ref_oricoords': [('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0)), 
-                                             ('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0))], 
+    null_peak = {'edc': 0, 'sol_contacts': [], '2fofc_sig_out': 0.0, 'wat_2fofc_ref_oricoords': (), 'pick_name': '',
+                 'c1': 0.0, 'clust_score': 0, 'so4_cc_2fofc_inv_out': 0.0, 'ambig': 0, 'charge': 0.0, 'bin': 0,
+                 'wat_cc_2fofc_in': 0.0, 'llgS': 0.0, 'fofc_sig_in': 0.0, '2fofc_sig_in': 0.0, 'llgW': 0.0, 'scr3': 0.0,
+                 'modexp_clust': [], 'tflag': 0, 'orires': '', 'so4_cc_fofc_inv_in': 0.0, 'resid': '0', 'resat': 'NUL_P0_O',
+                 'coord': (999.99, 999.99, 999.99), 'dmove': 0.0, 'unrg': 6626794411521655213, 'wat_cc_fofc_in': 0.0, 'ptype': '',
+                 'cont_db': {}, 'batch': 0, 'wat_cc_fofc_inv': 0.0, 'mod_for': [], 'pdb_code': '', 'clash': False,
+                 'so4_fofc_stdev_cc60': 0.0, 'contacts': [], 'so4_2fofc_stdev_cc60': 0.0, 'wat_cc_2fofc_out': 0.0, 'label': 0,
+                 'strip_contacts': [], 'score': 0.0, 'clust_rank': 0, 'rc': 0, 'so4_fofc_coord_out': (), 'prob': 0.0, 'wat_fofc_coord_out': (),
+                 'db_id': 'null_P_00000', 'ori_chain': 'P', 'so4_cc_2fofc_out': 0.0, 'wm': 0, 'wl': 0, 'solc': 0.0, 'so4_cc_fofc_out': 0.0,
+                 'wt': 0, 'master_dict': {}, 'ol': 0, 'so4_cc_fofc_in': 0.0, 'oh': 0, 'clust_mem': [], 'so4_cc_2fofc_in': 0.0, 'omit': 0,
+                 'pick': 0, 'cscore': 0.0, 'so4_cc_fofc_inv_rev': 0.0, 'peak_contacts': [], 'cc': 0, 'mm_contacts': [],
+                 'unat': -6006398286768061262, 'clust_cent': 0.0, 'cllgW': 0.0, 'cllgS': 0.0, 'unal': -8861610501908601326,
+                 'ori_resid': '0', 'mod_cont': [], 'om': 0, 'anc_for': [],
+                 'so4_2fofc_ref_oricoords': [('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0)),
+                                             ('X', (0.0, 0.0, 0.0)), ('X', (0.0, 0.0, 0.0))],
                  'filter_mask': [0, 0, 0, 0], 'info': {'symmetry': cs,
                                                        'param': all_params,
-                                                       'omit_mode': omit_mode}, 
-                 'scr1': 0.0, 'scr2': 0.0, 's_contacts': [], 'so4_cc_2fofc_inv_in': 0.0, 'clust_pair': [], 'anchor': {}, 
-                 'chainid': 'P', 'w_contacts': [], 'so4_cc_fofc_inv_out': 0.0, 'so4_cc_2fofc_inv_rev': 0.0, 'mf': 0, 
-                 'so4_2fofc_mean_cc60': 0.0, 'anc_cont': [], 'wat_cc_2fofc_inv': 0.0, 
+                                                       'omit_mode': omit_mode},
+                 'scr1': 0.0, 'scr2': 0.0, 's_contacts': [], 'so4_cc_2fofc_inv_in': 0.0, 'clust_pair': [], 'anchor': {},
+                 'chainid': 'P', 'w_contacts': [], 'so4_cc_fofc_inv_out': 0.0, 'so4_cc_2fofc_inv_rev': 0.0, 'mf': 0,
+                 'so4_2fofc_mean_cc60': 0.0, 'anc_cont': [], 'wat_cc_2fofc_inv': 0.0,
                  'prob_data': array([[ 0.,  0.,  0.,  0.],
                                      [ 0.,  0.,  0.,  0.],
-                                     [ 0.,  0.,  0.,  0.]]), 
-                 'fofc_sigo_scaled': 0.0, 'fofc_sig_out': 0.0, 'chiS': 0.0, 'chiW': 0.0, 'vol_fofc': 0.0, 'cchiW': 0.0, 
-                 'cchiS': 0.0, 'peak_unal_db': {}, 'status': -1, 'inputs': {'ori_hier': None}, 
-                 'mflag': 0, 'warnings': [], 'omit_contacts': [], '2fofc_sigo_scaled': 0.0, 'sol_mod': [], 'fc': 0, 'worst_mm': {}, 
+                                     [ 0.,  0.,  0.,  0.]]),
+                 'fofc_sigo_scaled': 0.0, 'fofc_sig_out': 0.0, 'chiS': 0.0, 'chiW': 0.0, 'vol_fofc': 0.0, 'cchiW': 0.0,
+                 'cchiS': 0.0, 'peak_unal_db': {}, 'status': -1, 'inputs': {'ori_hier': None},
+                 'mflag': 0, 'warnings': [], 'omit_contacts': [], '2fofc_sigo_scaled': 0.0, 'sol_mod': [], 'fc': 0, 'worst_mm': {},
                  'sp': 0, 'wat_cc_fofc_out': 0.0, 'st': 0, 'sm': 0, 'sl': 0, 'so4_fofc_mean_cc60': 0.0, 'model': 5, 'resolution': 0.0, 'vol_2fofc': 0.0}
     peak_unal_db[-8861610501908601326] = null_peak
     return
